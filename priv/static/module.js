@@ -2,128 +2,156 @@
   if (window._AnimExCaptchaTurnstileLoaded) return;
   window._AnimExCaptchaTurnstileLoaded = true;
 
-  // Ensure the Turnstile API script is present.
-  (function ensureScript() {
-    if (document.querySelector('script[src*="challenges.cloudflare.com/turnstile/v0/api.js"]')) return;
-    var s = document.createElement("script");
-    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-    s.async = true;
-    s.defer = true;
-    (document.head || document.documentElement).appendChild(s);
-  })();
+  window.AnimExCaptchaTurnstile = {
+    apiScriptLoaded: false,
+    apiScriptLoading: false,
 
-  function root() {
-    return document.body || document.documentElement;
-  }
+    // Loads https://challenges.cloudflare.com/turnstile/v0/api.js the first
+    // time a widget appears in the DOM (same pattern as
+    // AnimExAuthGAuth.loadScript — nothing is preloaded in <head>).
+    loadScript() {
+      if (this.apiScriptLoaded || this.apiScriptLoading) return;
+      if (!document.querySelector("[data-animex-turnstile-widget]")) return;
 
-  function pushClaim(btn, token) {
-    var target = btn.getAttribute("data-app-target") || "mines";
-    var action = btn.getAttribute("data-action") || "mine_claim";
-    var eventName = "app:" + target;
-    var payload = { action: action, params: { turnstile_token: token } };
-    var tryPush = function() {
-      if (window.liveSocket && typeof window.liveSocket.pushEventTo === "function") {
-        try {
-          window.liveSocket.pushEventTo(btn, eventName, payload);
-          return true;
-        } catch (e) {
-          return false;
-        }
+      if (window.turnstile) {
+        // Host already ships the api.js; no need to inject it again.
+        this.apiScriptLoaded = true;
+        this.initWidgets();
+        return;
       }
-      return false;
-    };
-    if (!tryPush()) {
-      var attempts = 0;
-      var timer = setInterval(function() {
-        attempts += 1;
-        if (tryPush() || attempts > 50) clearInterval(timer);
-      }, 100);
-    }
-  }
 
-  function initWidgets() {
-    root().querySelectorAll("[data-animex-turnstile-widget]:not([data-axts-init])").forEach(function(el) {
-      el.setAttribute("data-axts-init", "1");
-      var sitekey = el.getAttribute("data-animex-turnstile-sitekey") || el.getAttribute("data-sitekey");
-      var action = el.getAttribute("data-animex-turnstile-action") || el.getAttribute("data-action") || undefined;
-      var tokenKey = el.getAttribute("data-animex-turnstile-token-key") || el.getAttribute("data-token-key") || "animexTurnstileToken";
-      var buttonSelector = el.getAttribute("data-animex-turnstile-button") || el.getAttribute("data-button");
-      var theme = el.getAttribute("data-animex-turnstile-theme") || el.getAttribute("data-theme") || "auto";
+      this.apiScriptLoading = true;
 
-      var renderWidget = function() {
-        if (!window.turnstile) {
-          return setTimeout(renderWidget, 100);
-        }
-        var id = window.turnstile.render(el, {
-          sitekey: sitekey,
-          action: action,
-          theme: theme,
-          callback: function(token) {
-            window[tokenKey] = token;
-            window[tokenKey + "WidgetId"] = id;
-            if (buttonSelector) {
-              var btn = document.querySelector(buttonSelector);
-              if (btn) {
-                btn.disabled = false;
-                btn.removeAttribute("disabled");
-              }
-            }
-          },
-          "expired-callback": function() {
-            window[tokenKey] = null;
-          },
-          "error-callback": function() {
-            window[tokenKey] = null;
-          }
-        });
-        window[tokenKey + "WidgetId"] = id;
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        this.apiScriptLoaded = true;
+        this.apiScriptLoading = false;
+        this.initWidgets();
       };
-      renderWidget();
-    });
-  }
+      script.onerror = () => {
+        this.apiScriptLoading = false;
+      };
+      document.head.appendChild(script);
+    },
 
-  function initButtons() {
-    root().querySelectorAll("[data-animex-turnstile-claim]:not([data-axts-init])").forEach(function(btn) {
-      btn.setAttribute("data-axts-init", "1");
-      var tokenKey = btn.getAttribute("data-token-key") || "animexTurnstileToken";
+    // Explicit render of every pending Turnstile widget, then wiring of the
+    // claim button each one is bound to.
+    initWidgets() {
+      if (!this.apiScriptLoaded || !window.turnstile) return;
 
-      btn.addEventListener("click", function(event) {
+      document.querySelectorAll("[data-animex-turnstile-widget]").forEach((el) => {
+        if (el.dataset.animexTurnstileReady) return;
+        const sitekey = el.dataset.animexTurnstileSitekey;
+        if (!sitekey) return;
+
+        el.dataset.animexTurnstileReady = "true";
+
+        const tokenKey = el.dataset.animexTurnstileTokenKey || "animexTurnstileToken";
+        const options = {
+          sitekey: sitekey,
+          theme: el.dataset.animexTurnstileTheme || "auto",
+          callback: (token) => {
+            window[tokenKey] = token;
+            this.setButtonEnabled(el, true);
+          },
+          "expired-callback": () => {
+            window[tokenKey] = null;
+            this.setButtonEnabled(el, false);
+          },
+          "error-callback": () => {
+            window[tokenKey] = null;
+            this.setButtonEnabled(el, false);
+          }
+        };
+        const action = el.dataset.animexTurnstileAction;
+        if (action) options.action = action;
+
+        const widgetId = window.turnstile.render(el, options);
+        el.dataset.animexTurnstileWidgetId = String(widgetId);
+        window[tokenKey + "WidgetId"] = widgetId;
+
+        this.bindClaimButton(el);
+      });
+    },
+
+    // The claim button is owned by the host app; the widget only enables it
+    // once a token is available and dispatches its clicks.
+    bindClaimButton(el) {
+      const selector = el.dataset.animexTurnstileButton;
+      const target = el.dataset.animexTurnstileTarget;
+      if (!selector || !target) return;
+
+      const button = document.querySelector(selector);
+      if (!button || button.dataset.animexTurnstileClaimWired) return;
+      button.dataset.animexTurnstileClaimWired = "true";
+
+      button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopImmediatePropagation();
-        var token = window[tokenKey];
-        if (!token) return;
-        var widgetId = window[tokenKey + "WidgetId"];
-        pushClaim(btn, token);
-        window[tokenKey] = null;
-        setTimeout(function() {
-          if (widgetId && window.turnstile) {
-            window.turnstile.reset(widgetId);
-          }
-          btn.disabled = true;
-          btn.setAttribute("disabled", "disabled");
-        }, 250);
+        this.claim(el);
       });
-    });
-  }
+    },
 
-  function tick() {
-    try { initWidgets(); initButtons(); } catch (e) {}
-  }
+    claim(el) {
+      const tokenKey = el.dataset.animexTurnstileTokenKey || "animexTurnstileToken";
+      const token = window[tokenKey];
+      if (!token) return;
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", tick);
-  } else {
-    tick();
-  }
+      // Same dispatch pattern as AnimExAuthGAuth: replay the claim through
+      // a hidden [live-click] button so it arrives at the LiveView engine
+      // as app:<target> with {action, params}.
+      const target = el.dataset.animexTurnstileTarget;
+      const action = el.dataset.animexTurnstileAction || "turnstile_claim";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.style.display = "none";
+      button.setAttribute("live-click", "app:" + target);
+      button.setAttribute("live-value-action", action);
+      button.setAttribute(
+        "live-value-params",
+        JSON.stringify({ turnstile_token: token })
+      );
+      document.body.appendChild(button);
+      button.click();
+      setTimeout(() => button.remove(), 2000);
 
-  // Keep handling elements added by LiveView re-renders.
-  (function observe() {
-    var target = root();
-    if (!target || !window.MutationObserver) {
-      setTimeout(observe, 100);
-      return;
+      window[tokenKey] = null;
+      const widgetId = window[tokenKey + "WidgetId"];
+      if (widgetId !== undefined && window.turnstile) window.turnstile.reset(widgetId);
+      this.setButtonEnabled(el, false);
+    },
+
+    setButtonEnabled(el, enabled) {
+      const selector = el.dataset.animexTurnstileButton;
+      if (!selector) return;
+
+      const button = document.querySelector(selector);
+      if (!button) return;
+
+      if (enabled) {
+        button.disabled = false;
+        button.removeAttribute("disabled");
+      } else {
+        button.disabled = true;
+        button.setAttribute("disabled", "disabled");
+      }
     }
-    var observer = new MutationObserver(tick);
-    observer.observe(target, { childList: true, subtree: true });
-  })();
+  };
+
+  // ---------- Boot ----------
+  function bootAll() {
+    window.AnimExCaptchaTurnstile.loadScript();
+    window.AnimExCaptchaTurnstile.initWidgets();
+  }
+
+  new MutationObserver(() => bootAll()).observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
+
+  document.addEventListener("DOMContentLoaded", () => bootAll());
+  bootAll();
 })();

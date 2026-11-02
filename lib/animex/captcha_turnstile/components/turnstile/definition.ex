@@ -9,10 +9,10 @@ defmodule AnimEx.CaptchaTurnstile.Components.Turnstile.Definition do
 
       attr(:sitekey, :string, required: true)
       attr(:action, :string, default: nil)
+      attr(:target, :string, default: nil)
       attr(:token_key, :string, default: "animexTurnstileToken")
       attr(:button, :string, default: nil)
       attr(:theme, :string, default: "auto")
     end
   end
 end
-EOF
