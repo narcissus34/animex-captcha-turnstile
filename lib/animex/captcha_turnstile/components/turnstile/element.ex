@@ -11,17 +11,20 @@ defmodule AnimEx.CaptchaTurnstile.Components.Turnstile.Element do
       |> Map.put_new(:theme, "auto")
 
     ~A"""
-    <div
+    <.container
       id={@id}
-      data-animex-turnstile-widget
-      data-sitekey={@sitekey}
-      data-action={@action}
-      data-token-key={@token_key}
-      data-button={@button}
-      data-theme={@theme}
-    ></div>
+      data={
+        %{
+          "animex-turnstile-widget" => true,
+          "animex-turnstile-sitekey" => @sitekey,
+          "animex-turnstile-action" => @action,
+          "animex-turnstile-token-key" => @token_key,
+          "animex-turnstile-button" => @button,
+          "animex-turnstile-theme" => @theme
+        }
+      }
+    >
+    </.container>
     """
   end
 end
-EOF
-echo rewritten

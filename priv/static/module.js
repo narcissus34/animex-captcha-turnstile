@@ -44,11 +44,11 @@
   function initWidgets() {
     root().querySelectorAll("[data-animex-turnstile-widget]:not([data-axts-init])").forEach(function(el) {
       el.setAttribute("data-axts-init", "1");
-      var sitekey = el.getAttribute("data-sitekey");
-      var action = el.getAttribute("data-action") || undefined;
-      var tokenKey = el.getAttribute("data-token-key") || "animexTurnstileToken";
-      var buttonSelector = el.getAttribute("data-button");
-      var theme = el.getAttribute("data-theme") || "auto";
+      var sitekey = el.getAttribute("data-animex-turnstile-sitekey") || el.getAttribute("data-sitekey");
+      var action = el.getAttribute("data-animex-turnstile-action") || el.getAttribute("data-action") || undefined;
+      var tokenKey = el.getAttribute("data-animex-turnstile-token-key") || el.getAttribute("data-token-key") || "animexTurnstileToken";
+      var buttonSelector = el.getAttribute("data-animex-turnstile-button") || el.getAttribute("data-button");
+      var theme = el.getAttribute("data-animex-turnstile-theme") || el.getAttribute("data-theme") || "auto";
 
       var renderWidget = function() {
         if (!window.turnstile) {
