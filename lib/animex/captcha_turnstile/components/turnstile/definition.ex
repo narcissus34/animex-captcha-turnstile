@@ -7,7 +7,6 @@ defmodule AnimEx.CaptchaTurnstile.Components.Turnstile.Definition do
       attrs(Geometry, defaults: [width: {:percent, 100}])
       attrs(JavaScript)
 
-      attr(:id, :string, default: nil)
       attr(:sitekey, :string, required: true)
       attr(:action, :string, default: nil)
       attr(:token_key, :string, default: "animexTurnstileToken")

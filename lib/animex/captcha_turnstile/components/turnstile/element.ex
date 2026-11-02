@@ -12,7 +12,6 @@ defmodule AnimEx.CaptchaTurnstile.Components.Turnstile.Element do
 
     ~A"""
     <.container
-      id={@id}
       data={
         %{
           "animex-turnstile-widget" => true,
