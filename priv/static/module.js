@@ -127,5 +127,3 @@
     observer.observe(target, { childList: true, subtree: true });
   })();
 })();
-EOF
-echo done
