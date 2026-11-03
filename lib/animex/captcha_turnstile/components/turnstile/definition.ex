@@ -13,6 +13,7 @@ defmodule AnimEx.CaptchaTurnstile.Components.Turnstile.Definition do
       attr(:token_key, :string, default: "animexTurnstileToken")
       attr(:button, :string, default: nil)
       attr(:theme, :string, default: "auto")
+      attr(:invisible?, :boolean, default: false)
     end
   end
 end

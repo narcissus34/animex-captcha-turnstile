@@ -50,24 +50,36 @@
         el.dataset.animexTurnstileReady = "true";
 
         const tokenKey = el.dataset.animexTurnstileTokenKey || "animexTurnstileToken";
+        const invisible = el.dataset.animexTurnstileInvisible === "true";
         const options = {
           sitekey: sitekey,
           theme: el.dataset.animexTurnstileTheme || "auto",
           callback: (token) => {
             window[tokenKey] = token;
-            this.setButtonEnabled(el, true);
+            el.dataset.animexTurnstileExecuting = "";
+            if (invisible) {
+              this.claim(el);
+            } else {
+              this.setButtonEnabled(el, true);
+            }
           },
           "expired-callback": () => {
             window[tokenKey] = null;
+            el.dataset.animexTurnstileExecuting = "";
             this.setButtonEnabled(el, false);
           },
           "error-callback": () => {
             window[tokenKey] = null;
+            el.dataset.animexTurnstileExecuting = "";
             this.setButtonEnabled(el, false);
           }
         };
         const action = el.dataset.animexTurnstileAction;
         if (action) options.action = action;
+        if (invisible) {
+          options.appearance = "interaction-only";
+          options.execution = "execute";
+        }
 
         const widgetId = window.turnstile.render(el, options);
         el.dataset.animexTurnstileWidgetId = String(widgetId);
@@ -91,13 +103,43 @@
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopImmediatePropagation();
-        this.claim(el);
+
+        if (button.dataset.cooldown === "true") return;
+
+        const invisible = el.dataset.animexTurnstileInvisible === "true";
+        const widgetId = window[(el.dataset.animexTurnstileTokenKey || "animexTurnstileToken") + "WidgetId"];
+        const tokenKey = el.dataset.animexTurnstileTokenKey || "animexTurnstileToken";
+        const token = window[tokenKey];
+
+        if (!invisible) {
+          this.claim(el);
+          return;
+        }
+
+        if (el.dataset.animexTurnstileExecuting === "true") return;
+        if (token) {
+          this.claim(el);
+          return;
+        }
+
+        el.dataset.animexTurnstileExecuting = "true";
+        this.setButtonEnabled(el, false);
+
+        if (widgetId !== undefined && window.turnstile && typeof window.turnstile.execute === "function") {
+          window.turnstile.execute(widgetId);
+        } else {
+          // Execute is unavailable (very old API); fall back to immediate claim.
+          el.dataset.animexTurnstileExecuting = "";
+          this.setButtonEnabled(el, true);
+          this.claim(el);
+        }
       });
     },
 
     claim(el) {
       const tokenKey = el.dataset.animexTurnstileTokenKey || "animexTurnstileToken";
       const token = window[tokenKey];
+      el.dataset.animexTurnstileExecuting = "";
       if (!token) return;
 
       // Same dispatch pattern as AnimExAuthGAuth: replay the claim through

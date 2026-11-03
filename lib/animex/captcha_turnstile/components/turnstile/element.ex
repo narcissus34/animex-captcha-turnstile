@@ -13,7 +13,8 @@ defmodule AnimEx.CaptchaTurnstile.Components.Turnstile.Element do
           "animex-turnstile-target" => @target,
           "animex-turnstile-token-key" => @token_key,
           "animex-turnstile-button" => @button,
-          "animex-turnstile-theme" => @theme
+          "animex-turnstile-theme" => @theme,
+          "animex-turnstile-invisible" => @invisible?
         }
       }
       width={@width}
