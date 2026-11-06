@@ -5,7 +5,7 @@ defmodule AnimEx.CaptchaTurnstile.MixProject do
     [
       app: :animex_captcha_turnstile,
       version: "0.0.1",
-      elixir: "~> 1.20.4",
+      elixir: "~> 1.20.5",
       start_permanent: Mix.env() == :prod,
       compilers: Mix.compilers(),
       deps: deps()
