@@ -8,5 +8,4 @@ defmodule AnimEx.CaptchaTurnstile do
   `AnimEx.Web.Live.Modules`).
   """
 
-  use AnimEx.Module
 end
